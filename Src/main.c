@@ -157,11 +157,15 @@ int main(void)
   StepperMot_init(&stepper3, 20);
 
   //set LEDS ON
-  //HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0|GPIO_PIN_1, GPIO_PIN_SET);
- // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4, GPIO_PIN_SET);
- // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
- // HAL_GPIO_WritePin(GPIOG, GPIO_PIN_2|GPIO_PIN_7, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, GPIO_PIN_SET); //backlight
+  HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D2_R_GPIO_Port, D2_R_Pin ,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_SET);
+
+  HAL_GPIO_WritePin(Disp_backlight_GPIO_Port,Disp_backlight_Pin,GPIO_PIN_SET); //LCD backlight
+  HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_SET); //backlight
 
   /* USER CODE END 2 */
 
@@ -187,14 +191,12 @@ int main(void)
 	  }
 	  if(period_1000)
 	  {
-
-	  	  period_1000 = 0;
-	  }
-        /*u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
+		  /*u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
 	      u8g2_DrawStr(&u8g2, 0, 15, "Hello World!");
 	      u8g2_DrawCircle(&u8g2, 64, 40, 10, U8G2_DRAW_ALL);
 	      u8g2_UpdateDisplay(&u8g2);*/
-
+	  	  period_1000 = 0;
+	  }
 
     /* USER CODE END WHILE */
 
