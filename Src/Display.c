@@ -83,7 +83,7 @@ u8x8_byte_4wire_hw_spi (u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_pt
       HAL_SPI_Transmit(&hspi1, (uint8_t *)arg_ptr, arg_int, 10);
       break;
     case U8X8_MSG_BYTE_INIT:
-    	//HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_SET);
+    	//HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_RESET);
       break;
     case U8X8_MSG_BYTE_SET_DC:
       HAL_GPIO_WritePin (DC_PORT, DC_PIN, arg_int);
