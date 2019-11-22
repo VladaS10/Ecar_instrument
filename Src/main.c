@@ -26,6 +26,7 @@
 #include "StepperMot.h"
 #include "Display.h"
 #include "u8g2.h"
+#include "SPI_parallel.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -113,20 +114,21 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_GPIO_WritePin(DISP_RST_GPIO_Port,DISP_RST_Pin,GPIO_PIN_RESET);
+ /* HAL_GPIO_WritePin(DISP_RST_GPIO_Port,DISP_RST_Pin,GPIO_PIN_RESET);
   HAL_GPIO_WritePin(DISP_CS_GPIO_Port,DISP_CS_Pin,GPIO_PIN_SET);
   HAL_Delay(200);
   HAL_GPIO_WritePin(DISP_RST_GPIO_Port,DISP_RST_Pin,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(DISP_CS_GPIO_Port,DISP_CS_Pin,GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(DISP_CS_GPIO_Port,DISP_CS_Pin,GPIO_PIN_RESET);*/
 
   //Display init
-  u8g2_t u8g2; // a structure which will contain all the data for one display
-  //u8g2_Setup_uc1608_240x128_f(&u8g2, U8G2_R0, u8x8_byte_4wire_hw_spi, u8x8_stm32_gpio_and_delay);  // init u8g2 structure
-  //u8g2_Setup_uc1608_erc240120_f(&u8g2, U8G2_R0, u8x8_byte_4wire_hw_spi, u8x8_stm32_gpio_and_delay);
-  u8g2_Setup_st7565_erc12864_alt_f(&u8g2, U8G2_R2, u8x8_byte_4wire_hw_spi, u8x8_stm32_gpio_and_delay);
+  u8g2_t u8g2; /* a structure which will contain all the data for one display */
+  /*u8g2_Setup_st7565_erc12864_alt_f(&u8g2, U8G2_R2, u8x8_byte_4wire_hw_spi, u8x8_stm32_gpio_and_delay);
   u8g2_InitDisplay(&u8g2); // send init sequence to the display, display is in sleep mode after this,
-  u8g2_SetPowerSave(&u8g2, 0); // wake up display
-  //u8g2_SetContrast(&u8g2,28);
+  u8g2_SetPowerSave(&u8g2, 0); // wake up display*/
+
+  u8g2_Setup_ks0108_128x64_f(&u8g2, U8G2_R0, u8x8_byte_parallel_hw_spi, u8x8_gpio_delay_parallel);
+  u8g2_InitDisplay(&u8g2);
+  u8g2_SetPowerSave(&u8g2, 0);
 
   //init STEPPERS
   stepper1.port[0] = GPIOE;
@@ -166,12 +168,15 @@ int main(void)
   //HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,GPIO_PIN_SET);
   HAL_GPIO_WritePin(D2_R_GPIO_Port, D2_R_Pin ,GPIO_PIN_SET);
   //HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,GPIO_PIN_SET); /** NOT WORKING!!! */
   //HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,GPIO_PIN_SET);
   //HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_SET);
 
   HAL_GPIO_WritePin(Disp_backlight_GPIO_Port,Disp_backlight_Pin,GPIO_PIN_SET); //LCD backlight
   //HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_SET); //backlight
+
+  spip_init();
+  spip_send_word(0xF08F);
 
   /* USER CODE END 2 */
 
@@ -192,18 +197,26 @@ int main(void)
 	  }
 	  if(period_100)
 	  {
+		  spip_send_word(0xAF07);
 
 		  period_100 = 0;
 	  }
 	  if(period_1000)
 	  {
-		  u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
-	      u8g2_DrawStr(&u8g2, 0, 15, "Hello World!");
-	      u8g2_DrawCircle(&u8g2, 60, 40, 10, U8G2_DRAW_ALL);
-	      u8g2_UpdateDisplay(&u8g2);
+
 
 	  	  period_1000 = 0;
 	  }
+
+	  HAL_Delay(500);
+	  u8g2_SetFont(&u8g2, u8g2_font_ncenB12_tr);
+	  	      u8g2_DrawStr(&u8g2, 5, 15, "Hello World!");
+	  	      u8g2_DrawCircle(&u8g2, 60, 40, 10, U8G2_DRAW_ALL);
+	  	      u8g2_UpdateDisplay(&u8g2);
+
+	  HAL_Delay(500);
+	  u8g2_ClearBuffer(&u8g2);
+	  u8g2_UpdateDisplay(&u8g2);
 
     /* USER CODE END WHILE */
 
