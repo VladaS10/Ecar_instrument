@@ -23,6 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stdio.h"
+#include "stdlib.h"
 #include "StepperMot.h"
 #include "Display.h"
 #include "u8g2.h"
@@ -178,6 +180,9 @@ int main(void)
   spip_init();
   spip_send_word(0xF08F);
 
+  char char_voltage[] = "500";
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -203,20 +208,26 @@ int main(void)
 	  }
 	  if(period_1000)
 	  {
+			 //  snprintf(char_voltage, 3,"%d" , (int)(baseTimer/1000) );
+			  u8g2_ClearBuffer(&u8g2);
 
+			  itoa((int)(baseTimer/1000), char_voltage, 10);
 
-	  	  period_1000 = 0;
+			  u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+			  u8g2_DrawStr(&u8g2, 5, 15, "Runtime");
+			  u8g2_DrawRBox(&u8g2, 60, 40, 30, 20, 3);// (&u8g2, 10, 60, 0, "Button");
+			  u8g2_DrawStr(&u8g2, 40, 30, char_voltage);
+			  u8g2_DrawStr(&u8g2, 60, 30, "s");
+			  	      //u8g2_DrawCircle(&u8g2, 60, 40, 10, U8G2_DRAW_ALL);
+			  u8g2_UpdateDisplay(&u8g2);
+			  //u8g2_UpdateDisplayArea(&u8g2, 40, 30, 20, );
+		  period_1000 = 0;
 	  }
 
-	  HAL_Delay(500);
-	  u8g2_SetFont(&u8g2, u8g2_font_ncenB12_tr);
-	  	      u8g2_DrawStr(&u8g2, 5, 15, "Hello World!");
-	  	      u8g2_DrawCircle(&u8g2, 60, 40, 10, U8G2_DRAW_ALL);
-	  	      u8g2_UpdateDisplay(&u8g2);
-
-	  HAL_Delay(500);
-	  u8g2_ClearBuffer(&u8g2);
-	  u8g2_UpdateDisplay(&u8g2);
+//
+//		  HAL_Delay(1000);
+//	  u8g2_ClearBuffer(&u8g2);
+//	  u8g2_UpdateDisplay(&u8g2);
 
     /* USER CODE END WHILE */
 
@@ -419,7 +430,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
