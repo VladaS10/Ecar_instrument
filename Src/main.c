@@ -33,11 +33,31 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum
+{
+	M0, //Default
+	M1,
+	M2
+}DISP_MODE;
+
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+/*DISPLAY dimensions*/
+#define DISP_W 128
+#define DISP_H 64
+
+#define DISP_MOD_W 16
+#define DISP_MOD_H 24
+
+#define DISP_LINE1_Y 40
+#define DISP_ODO_size 11
+#define DISP_LINE2_Y 51
+#define DISP_TRIP_size 11
+
+/*LED control definitions*/
 
 /* USER CODE END PD */
 
@@ -58,6 +78,11 @@ SPI_HandleTypeDef hspi1;
 s_STEPPER stepper1, stepper2, stepper3;
 uint64_t baseTimer = 0;
 uint8_t period_1, period_10, period_100, period_1000;
+uint32_t odo_dist, trip_dist, drive_mode;
+
+char char_mode[] = "P";
+char char_odo[] = "000000";
+char char_trip[] = "0000.0";
 
 /* USER CODE END PV */
 
@@ -75,6 +100,46 @@ static void MX_SPI1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+void int2str(char* array, int32_t number, uint32_t a_length, char fill_char)
+{
+
+}
+
+void display_redraw(DISP_MODE disp_mode)
+{
+	u8g2_ClearBuffer(&u8g2);
+
+
+	switch(disp_mode)
+	{
+		// default
+		case M0:
+			break;
+		// Mode1 - battery
+		case M1:
+			break;
+		// Mode2 - power settings
+		case M2:
+			break;
+	}
+	//MODE
+	u8g2_DrawFrame(&u8g2, DISP_W-DISP_MOD_W, DISP_H-1, DISP_MOD_W, DISP_MOD_H);
+	u8g2_SetFont(&u8g2, u8g2_font_crox5hb_tr);
+	u8g2_DrawStr(&u8g2, DISP_W - DISP_MOD_W + 2, DISP_H-2, char_mode);
+	//ODO + TRIP
+	u8g2_DrawLine(&u8g2, 0, DISP_LINE1_Y, DISP_W - DISP_MOD_W , DISP_LINE1_Y);
+	u8g2_DrawLine(&u8g2, 0, DISP_LINE2_Y, DISP_W - DISP_MOD_W, DISP_LINE2_Y);
+	u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
+	u8g2_DrawStr(&u8g2, 02, DISP_LINE1_Y + DISP_TRIP_size, "TRIP");
+	u8g2_DrawStr(&u8g2, 02, DISP_LINE2_Y + DISP_ODO_size, "ODO");
+	u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
+	int2str(char_trip, trip_dist, 4, ' ');
+	u8g2_DrawStr(&u8g2, 20, DISP_LINE1_Y + DISP_TRIP_size, char_trip);
+	int2str(char_odo, odo_dist, 6, ' ');
+	u8g2_DrawStr(&u8g2, 20, DISP_LINE2_Y + DISP_ODO_size, char_odo);
+	u8g2_UpdateDisplay(&u8g2);
+}
 
 
 /* USER CODE END 0 */
