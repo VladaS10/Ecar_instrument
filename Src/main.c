@@ -40,6 +40,8 @@ typedef enum
 	M2
 }DISP_MODE;
 
+char drive_mode_char[] = "PNRDSEU";
+
 
 /* USER CODE END PTD */
 
@@ -49,13 +51,13 @@ typedef enum
 #define DISP_W 128
 #define DISP_H 64
 
-#define DISP_MOD_W 16
-#define DISP_MOD_H 24
+#define DISP_MOD_W 20
+#define DISP_MOD_H 22
 
-#define DISP_LINE1_Y 40
-#define DISP_ODO_size 11
-#define DISP_LINE2_Y 51
-#define DISP_TRIP_size 11
+#define DISP_LINE1_Y 42
+#define DISP_ODO_size 10
+#define DISP_LINE2_Y 53
+#define DISP_TRIP_size 10
 
 /*LED control definitions*/
 
@@ -76,9 +78,11 @@ SPI_HandleTypeDef hspi1;
 
 
 s_STEPPER stepper1, stepper2, stepper3;
+u8g2_t u8g2;
 uint64_t baseTimer = 0;
 uint8_t period_1, period_10, period_100, period_1000;
-uint32_t odo_dist, trip_dist, drive_mode;
+uint8_t sw1_pressed = 0, sw2_pressed = 0;
+uint32_t odo_dist = 0, trip_dist = 0, drive_mode = 0;
 
 char char_mode[] = "P";
 char char_odo[] = "000000";
@@ -124,8 +128,9 @@ void display_redraw(DISP_MODE disp_mode)
 			break;
 	}
 	//MODE
-	u8g2_DrawFrame(&u8g2, DISP_W-DISP_MOD_W, DISP_H-1, DISP_MOD_W, DISP_MOD_H);
-	u8g2_SetFont(&u8g2, u8g2_font_crox5hb_tr);
+	u8g2_DrawFrame(&u8g2, DISP_W-DISP_MOD_W, DISP_H-DISP_MOD_H, DISP_MOD_W, DISP_MOD_H);
+	u8g2_SetFont(&u8g2, u8g2_font_timB18_tr);
+	char_mode[0] = drive_mode_char[drive_mode];
 	u8g2_DrawStr(&u8g2, DISP_W - DISP_MOD_W + 2, DISP_H-2, char_mode);
 	//ODO + TRIP
 	u8g2_DrawLine(&u8g2, 0, DISP_LINE1_Y, DISP_W - DISP_MOD_W , DISP_LINE1_Y);
@@ -135,9 +140,9 @@ void display_redraw(DISP_MODE disp_mode)
 	u8g2_DrawStr(&u8g2, 02, DISP_LINE2_Y + DISP_ODO_size, "ODO");
 	u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
 	int2str(char_trip, trip_dist, 4, ' ');
-	u8g2_DrawStr(&u8g2, 20, DISP_LINE1_Y + DISP_TRIP_size, char_trip);
+	u8g2_DrawStr(&u8g2, 60, DISP_LINE1_Y + DISP_TRIP_size, char_trip);
 	int2str(char_odo, odo_dist, 6, ' ');
-	u8g2_DrawStr(&u8g2, 20, DISP_LINE2_Y + DISP_ODO_size, char_odo);
+	u8g2_DrawStr(&u8g2, 60, DISP_LINE2_Y + DISP_ODO_size, char_odo);
 	u8g2_UpdateDisplay(&u8g2);
 }
 
@@ -188,7 +193,7 @@ int main(void)
   HAL_GPIO_WritePin(DISP_CS_GPIO_Port,DISP_CS_Pin,GPIO_PIN_RESET);*/
 
   //Display init
-  u8g2_t u8g2; /* a structure which will contain all the data for one display */
+   /* a structure which will contain all the data for one display */
   /*u8g2_Setup_st7565_erc12864_alt_f(&u8g2, U8G2_R2, u8x8_byte_4wire_hw_spi, u8x8_stm32_gpio_and_delay);
   u8g2_InitDisplay(&u8g2); // send init sequence to the display, display is in sleep mode after this,
   u8g2_SetPowerSave(&u8g2, 0); // wake up display*/
@@ -232,12 +237,12 @@ int main(void)
   StepperMot_init(&stepper3, 20);
 
   //set LEDS ON
-  //HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,GPIO_PIN_SET);
   HAL_GPIO_WritePin(D2_R_GPIO_Port, D2_R_Pin ,GPIO_PIN_SET);
-  //HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,GPIO_PIN_SET);
   HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,GPIO_PIN_SET); /** NOT WORKING!!! */
-  //HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,GPIO_PIN_SET);
-  //HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_SET);
 
   HAL_GPIO_WritePin(Disp_backlight_GPIO_Port,Disp_backlight_Pin,GPIO_PIN_SET); //LCD backlight
   //HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_SET); //backlight
@@ -245,7 +250,7 @@ int main(void)
   spip_init();
   spip_send_word(0xF08F);
 
-  char char_voltage[] = "500";
+  //char char_voltage[] = "500";
 
 
   /* USER CODE END 2 */
@@ -263,6 +268,25 @@ int main(void)
 	  {
 		  StepperMot_step(&stepper1);
 		  StepperMot_step(&stepper3);
+
+		  if(sw1_pressed == 0 && HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin))
+		  {
+			  sw1_pressed = 1;
+			  drive_mode = drive_mode >= 6 ? 0 : drive_mode+1;
+		  }
+		  else if(HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin) == 0)
+		  {
+			  sw1_pressed = 0;
+		  }
+		  if(sw2_pressed == 0 && HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin))
+		  		  {
+		  			  sw2_pressed = 1;
+		  			  HAL_GPIO_TogglePin(Backlight_GPIO_Port, Backlight_Pin);
+		  		  }
+		  		  else if(HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin) == 0)
+		  		  {
+		  			  sw2_pressed = 0;
+		  		  }
 		  period_10 = 0;
 	  }
 	  if(period_100)
@@ -273,7 +297,8 @@ int main(void)
 	  }
 	  if(period_1000)
 	  {
-			 //  snprintf(char_voltage, 3,"%d" , (int)(baseTimer/1000) );
+		  display_redraw(M0);
+		/*	 //  snprintf(char_voltage, 3,"%d" , (int)(baseTimer/1000) );
 			  u8g2_ClearBuffer(&u8g2);
 
 			  itoa((int)(baseTimer/1000), char_voltage, 10);
@@ -285,7 +310,7 @@ int main(void)
 			  u8g2_DrawStr(&u8g2, 60, 30, "s");
 			  	      //u8g2_DrawCircle(&u8g2, 60, 40, 10, U8G2_DRAW_ALL);
 			  u8g2_UpdateDisplay(&u8g2);
-			  //u8g2_UpdateDisplayArea(&u8g2, 40, 30, 20, );
+			  //u8g2_UpdateDisplayArea(&u8g2, 40, 30, 20, );*/
 		  period_1000 = 0;
 	  }
 
