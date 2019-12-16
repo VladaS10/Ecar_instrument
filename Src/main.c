@@ -52,7 +52,7 @@ typedef enum
 	INST_ERR
 }INSTRUMENT_STATE;
 
-char drive_mode_char[] = "PNRDSEU";
+char drive_mode_char[] = "PRNDESI";
 
 
 /* USER CODE END PTD */
@@ -656,6 +656,7 @@ static void MX_CAN1_Init(void)
   }
   /* USER CODE BEGIN CAN1_Init 2 */
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+  HAL_CAN_Start(&hcan1);
   /* USER CODE END CAN1_Init 2 */
 
 }

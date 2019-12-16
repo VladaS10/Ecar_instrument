@@ -206,14 +206,10 @@ void SysTick_Handler(void)
 void CAN1_RX0_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN1_RX0_IRQn 0 */
-	uint8_t can_message[8];
-	CAN_RxHeaderTypeDef can_message_header;
 
   /* USER CODE END CAN1_RX0_IRQn 0 */
   HAL_CAN_IRQHandler(&hcan1);
   /* USER CODE BEGIN CAN1_RX0_IRQn 1 */
-
-  HAL_CAN_GetRxMessage(&hcan1, 0, &can_message_header, can_message);
 
   /* USER CODE END CAN1_RX0_IRQn 1 */
 }
