@@ -29,16 +29,28 @@
 #include "Display.h"
 #include "u8g2.h"
 #include "SPI_parallel.h"
+#include "can_handler.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 typedef enum
 {
-	M0, //Default
-	M1,
-	M2
+	DISP_M0, //Default
+	DISP_M1,
+	DISP_M2,
+	DISP_Mcharge,
+	DISP_Mlast
 }DISP_MODE;
+
+typedef enum
+{
+	INST_INIT,
+	INST_DRIVE,
+	INST_CHARGE,
+	INST_OFF,
+	INST_ERR
+}INSTRUMENT_STATE;
 
 char drive_mode_char[] = "PNRDSEU";
 
@@ -82,7 +94,18 @@ u8g2_t u8g2;
 uint64_t baseTimer = 0;
 uint8_t period_1, period_10, period_100, period_1000;
 uint8_t sw1_pressed = 0, sw2_pressed = 0;
-uint32_t odo_dist = 0, trip_dist = 0, drive_mode = 0;
+uint32_t odo_dist = 12340, trip_dist = 2500;
+uint8_t drive_mode = 0;
+DISP_MODE display_mode = DISP_M0;
+
+uint16_t hp_batt_tem_C = 0;
+uint16_t hp_batt_volt = 0;
+uint16_t hp_batt_perc = 0;
+
+uint16_t lp_batt_volt = 0; /*OK 12-15V 0.1V*/
+
+char univ_string4[] = "1234";
+char univ_string6[] = "123456";
 
 char char_mode[] = "P";
 char char_odo[] = "000000";
@@ -105,26 +128,164 @@ static void MX_SPI1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void int2str(char* array, int32_t number, uint32_t a_length, char fill_char)
+void L_button()
 {
-
+	trip_dist = 0;
+	if(sw2_pressed)	HAL_GPIO_TogglePin(Backlight_GPIO_Port, Backlight_Pin);
+}
+void R_button() /*OK*/
+{
+	display_mode++;
+	if(display_mode > DISP_M2) display_mode = DISP_M0;
 }
 
-void display_redraw(DISP_MODE disp_mode)
+#define OUT_BAT400 	2
+#define OUT_REL400 	1
+#define OUT_FAN_BAT	5
+#define OUT_FAN_MOT 4
+#define OUT_PUMPS	3
+
+
+void set_out(uint8_t out_nr, uint8_t out_enable)
+{
+	switch (out_nr) {
+		case 1:
+			HAL_GPIO_WritePin(OUT1_GPIO_Port, OUT1_Pin, out_enable);
+			break;
+		case 2:
+			HAL_GPIO_WritePin(OUT2_GPIO_Port, OUT2_Pin, out_enable);
+			break;
+		case 3:
+			HAL_GPIO_WritePin(OUT3_GPIO_Port, OUT3_Pin, out_enable);
+			break;
+		case 4:
+			HAL_GPIO_WritePin(OUT4_GPIO_Port, OUT4_Pin, out_enable);
+			break;
+		case 5:
+			HAL_GPIO_WritePin(OUT5_GPIO_Port, OUT5_Pin, out_enable);
+			break;
+		case 6:
+			HAL_GPIO_WritePin(OUT6_GPIO_Port, OUT6_Pin, out_enable);
+			break;
+	}
+}
+
+typedef enum
+{
+	LED_PARKING, /*OK*/
+	LED_BRAKE_PEDAL,
+	LED_LOW_BATT, /*OK*/
+	LED_CHARGING_ERROR, /*OK*/
+	LED_OVERHEAT,
+	LED_CHECK_ENGINE
+}LED_INDICATOR;
+
+void set_indicator(LED_INDICATOR indicator, uint8_t ind_enable)
+{
+	switch (indicator) {
+		case LED_PARKING:
+			HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,ind_enable);
+			break;
+		case LED_BRAKE_PEDAL:
+			HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,ind_enable);
+			break;
+		case LED_LOW_BATT:
+			HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,ind_enable);
+			break;
+		case LED_CHARGING_ERROR:
+			HAL_GPIO_WritePin(D2_R_GPIO_Port, D2_R_Pin ,ind_enable);
+			break;
+		case LED_OVERHEAT:
+			HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,ind_enable);
+			break;
+		case LED_CHECK_ENGINE:
+			HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,ind_enable);
+			break;
+	}
+}
+
+void get_lp_voltage()
+{
+	if(HAL_ADC_GetValue(&hadc1) < 1900) lp_batt_volt = 0;
+	else
+		lp_batt_volt = (10 * HAL_ADC_GetValue(&hadc1) - 18120)/104;
+}
+
+
+void int2str(char* array, int32_t number, uint32_t a_length, char fill_char) /*OK*/
+{
+	for(uint8_t i = a_length; i > 0; i--)
+	{
+		if(number == 0 && i < a_length ) array[i-1] = fill_char;
+		else
+		{
+			array[i-1] = (number % 10) + '0';
+			number = number/10;
+		}
+	}
+}
+
+void fp2str(char* array, int32_t number, uint8_t point_pos, uint32_t a_length, char fill_char)/*OK*/
+{
+	for(uint8_t i = a_length; i > 0; i--)
+	{
+		if(i == a_length-point_pos && i < a_length)
+		{
+			array[i-1] = '.';
+		}
+		else if(number == 0 && i < a_length ) array[i-1] = fill_char;
+		else
+		{
+			array[i-1] = (number % 10) + '0';
+			number = number/10;
+		}
+	}
+}
+
+void draw_bargraph(uint8_t y_line, uint16_t percent, char* b_min, char* b_max)/*OK*/
+{
+	u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
+	u8g2_DrawStr(&u8g2, 1, y_line + 8, b_min);
+	u8g2_DrawStr(&u8g2, 105, y_line + 8, b_max);
+	u8g2_DrawFrame(&u8g2, 24, y_line, 80, 8);
+	u8g2_DrawBox(&u8g2, 24, y_line, (percent<<3)/10, 8);
+}
+
+void display_redraw()
 {
 	u8g2_ClearBuffer(&u8g2);
 
 
-	switch(disp_mode)
+	switch(display_mode)
 	{
 		// default
-		case M0:
+		case DISP_M0:
+			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
+			u8g2_DrawStr(&u8g2, 30, 20, "Mode1");
+			draw_bargraph(30,hp_batt_tem_C,"  0%","100%");
 			break;
 		// Mode1 - battery
-		case M1:
+		case DISP_M1:
+			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
+			u8g2_DrawStr(&u8g2, 30, 20, "Mode2");
+
+			u8g2_DrawStr(&u8g2, 60, 38, "V");
+			fp2str(univ_string6, lp_batt_volt, 1, 6, ' ');
+			u8g2_DrawStr(&u8g2, 30, 38, univ_string6);
+
 			break;
 		// Mode2 - power settings
-		case M2:
+		case DISP_M2:
+			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
+			u8g2_DrawStr(&u8g2, 30, 20, "Mode3");
+			break;
+		case DISP_Mcharge: /*OK*/
+			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
+			u8g2_DrawStr(&u8g2, 35, 20, "CHARGING");
+			draw_bargraph(30,hp_batt_perc,"  0%","100%");
+			break;
+		case DISP_Mlast:
+		default:
 			break;
 	}
 	//MODE
@@ -139,20 +300,20 @@ void display_redraw(DISP_MODE disp_mode)
 	u8g2_DrawStr(&u8g2, 02, DISP_LINE1_Y + DISP_TRIP_size, "TRIP");
 	u8g2_DrawStr(&u8g2, 02, DISP_LINE2_Y + DISP_ODO_size, "ODO");
 	u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
-	int2str(char_trip, trip_dist, 4, ' ');
+	fp2str(char_trip, trip_dist, 1, 6, '0');
 	u8g2_DrawStr(&u8g2, 60, DISP_LINE1_Y + DISP_TRIP_size, char_trip);
-	int2str(char_odo, odo_dist, 6, ' ');
+	int2str(char_odo, odo_dist, 6, '0');
 	u8g2_DrawStr(&u8g2, 60, DISP_LINE2_Y + DISP_ODO_size, char_odo);
 	u8g2_UpdateDisplay(&u8g2);
 }
-
-
 /* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
   * @retval int
   */
+
+HAL_CAN_StateTypeDef CAN_state1;
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -166,6 +327,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+  INSTRUMENT_STATE inst_state = INST_INIT;
 
   /* USER CODE END Init */
 
@@ -185,72 +347,62 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-
- /* HAL_GPIO_WritePin(DISP_RST_GPIO_Port,DISP_RST_Pin,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(DISP_CS_GPIO_Port,DISP_CS_Pin,GPIO_PIN_SET);
-  HAL_Delay(200);
-  HAL_GPIO_WritePin(DISP_RST_GPIO_Port,DISP_RST_Pin,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(DISP_CS_GPIO_Port,DISP_CS_Pin,GPIO_PIN_RESET);*/
-
-  //Display init
-   /* a structure which will contain all the data for one display */
-  /*u8g2_Setup_st7565_erc12864_alt_f(&u8g2, U8G2_R2, u8x8_byte_4wire_hw_spi, u8x8_stm32_gpio_and_delay);
-  u8g2_InitDisplay(&u8g2); // send init sequence to the display, display is in sleep mode after this,
-  u8g2_SetPowerSave(&u8g2, 0); // wake up display*/
+  HAL_Delay(100);
+  get_lp_voltage();
 
   u8g2_Setup_ks0108_128x64_f(&u8g2, U8G2_R0, u8x8_byte_parallel_hw_spi, u8x8_gpio_delay_parallel);
   u8g2_InitDisplay(&u8g2);
   u8g2_SetPowerSave(&u8g2, 0);
 
-  //init STEPPERS
-  stepper1.port[0] = GPIOE;
-  stepper1.pin[0] = GPIO_PIN_9;
-  stepper1.port[1] = GPIOE;
-  stepper1.pin[1] = GPIO_PIN_11;
-  stepper1.port[2] = GPIOE;
-  stepper1.pin[2] = GPIO_PIN_8;
-  stepper1.port[3] = GPIOB;
-  stepper1.pin[3] = GPIO_PIN_0;
-  stepper1.direction = FORWARD;
-  StepperMot_init(&stepper1, 20);
+  if(lp_batt_volt < 50) inst_state = INST_CHARGE;
 
-  stepper2.port[0] = GPIOE;
-  stepper2.pin[0] = GPIO_PIN_13;
-  stepper2.port[1] = GPIOC;
-  stepper2.pin[1] = GPIO_PIN_6;
-  stepper2.port[2] = GPIOB;
-  stepper2.pin[2] = GPIO_PIN_1;
-  stepper2.port[3] = GPIOA;
-  stepper2.pin[3] = GPIO_PIN_7;
-  stepper2.direction = FORWARD;
-  StepperMot_init(&stepper2, 100);
+  if(inst_state == INST_INIT)
+  {
+	  //init STEPPERS
+	  stepper1.port[0] = GPIOE;
+	  stepper1.pin[0] = GPIO_PIN_9;
+	  stepper1.port[1] = GPIOE;
+	  stepper1.pin[1] = GPIO_PIN_11;
+	  stepper1.port[2] = GPIOE;
+	  stepper1.pin[2] = GPIO_PIN_8;
+	  stepper1.port[3] = GPIOB;
+	  stepper1.pin[3] = GPIO_PIN_0;
+	  stepper1.direction = FORWARD;
+	  StepperMot_init(&stepper1, 20);
 
-  stepper3.port[0] = GPIOC;
-  stepper3.pin[0] = GPIO_PIN_7;
-  stepper3.port[1] = GPIOC;
-  stepper3.pin[1] = GPIO_PIN_8;
-  stepper3.port[2] = GPIOB;
-  stepper3.pin[2] = GPIO_PIN_14;
-  stepper3.port[3] = GPIOB;
-  stepper3.pin[3] = GPIO_PIN_15;
-  stepper3.direction = BACKWARD;
-  StepperMot_init(&stepper3, 20);
+	  stepper2.port[0] = GPIOE;
+	  stepper2.pin[0] = GPIO_PIN_13;
+	  stepper2.port[1] = GPIOC;
+	  stepper2.pin[1] = GPIO_PIN_6;
+	  stepper2.port[2] = GPIOB;
+	  stepper2.pin[2] = GPIO_PIN_1;
+	  stepper2.port[3] = GPIOA;
+	  stepper2.pin[3] = GPIO_PIN_7;
+	  stepper2.direction = FORWARD;
+	  StepperMot_init(&stepper2, 100);
 
-  //set LEDS ON
-  HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(D2_R_GPIO_Port, D2_R_Pin ,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,GPIO_PIN_SET); /** NOT WORKING!!! */
-  HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_SET);
+	  stepper3.port[0] = GPIOC;
+	  stepper3.pin[0] = GPIO_PIN_7;
+	  stepper3.port[1] = GPIOC;
+	  stepper3.pin[1] = GPIO_PIN_8;
+	  stepper3.port[2] = GPIOB;
+	  stepper3.pin[2] = GPIO_PIN_14;
+	  stepper3.port[3] = GPIOB;
+	  stepper3.pin[3] = GPIO_PIN_15;
+	  stepper3.direction = BACKWARD;
+	  StepperMot_init(&stepper3, 20);
+
+		  //set LEDS ON
+		  HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(D2_R_GPIO_Port, D2_R_Pin ,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_SET); //backlight
+  }
 
   HAL_GPIO_WritePin(Disp_backlight_GPIO_Port,Disp_backlight_Pin,GPIO_PIN_SET); //LCD backlight
-  //HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_SET); //backlight
-
-  spip_init();
-  spip_send_word(0xF08F);
-
-  //char char_voltage[] = "500";
 
 
   /* USER CODE END 2 */
@@ -259,10 +411,78 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  switch (inst_state)
+	  {
+	  	  case INST_INIT :
+			  if(stepper1.at_position && stepper2.at_position && stepper3.at_position)
+			  {
+				  inst_state = INST_DRIVE;
+				  HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,GPIO_PIN_RESET);
+				  HAL_GPIO_WritePin(D2_R_GPIO_Port, D2_R_Pin ,GPIO_PIN_RESET);
+				  HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,GPIO_PIN_RESET);
+				  HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,GPIO_PIN_RESET);
+				  HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,GPIO_PIN_RESET);
+				  HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_RESET);
+			  }
+	  		  break;
+	  	  case INST_DRIVE:
+	  		  /*TODO DRIVE MODE*/
+	  		  /*LED control*/
+
+
+	  		  set_out(OUT_REL400, 1);  /*motor relay ON*/
+	  		  set_out(OUT_BAT400, 1); /*HP battery switch ON*/
+	  		  set_out(OUT_PUMPS, 1);  /*OUT control - cooling*/
+
+	  		  if(lp_batt_volt < 125) set_indicator(LED_CHARGING_ERROR, 1);
+	  		  else set_indicator(LED_CHARGING_ERROR, 0);
+
+	  		  if(lp_batt_volt < 50) inst_state = INST_OFF;
+
+	  		  break;
+	  	  case INST_CHARGE:
+	  		  display_mode = DISP_Mcharge;
+	  		  /*HP battery switch ON*/
+	  		  set_out(OUT_BAT400, 1);
+	  		  /*TODO CHARGE MODE*/
+	  		  break;
+	  	  case INST_OFF:
+	  		  HAL_GPIO_WritePin(D1_R_GPIO_Port,D1_R_Pin,GPIO_PIN_RESET);
+	  		  HAL_GPIO_WritePin(D2_R_GPIO_Port, D2_R_Pin ,GPIO_PIN_RESET);
+	  		  HAL_GPIO_WritePin(D3_R_GPIO_Port,D3_R_Pin,GPIO_PIN_RESET);
+	  		  HAL_GPIO_WritePin(D4_Y_GPIO_Port,D4_Y_Pin,GPIO_PIN_RESET);
+	  		  HAL_GPIO_WritePin(D5_Y_GPIO_Port,D5_Y_Pin,GPIO_PIN_RESET);
+	  		  HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_RESET);
+	  		  HAL_GPIO_WritePin(Disp_backlight_GPIO_Port,Disp_backlight_Pin,GPIO_PIN_RESET); //LCD backlight
+	  		  //HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_RESET); //backlight
+
+	  		  /*steppers to 0 */
+	  		  stepper1.wPosition = 0;
+	  		  stepper2.wPosition = 0;
+	  		  stepper3.wPosition = 0;
+
+	  		  set_out(OUT_REL400, 0);/*motor relay OFF*/
+			  set_out(OUT_BAT400, 0);/*HP battery switch OFF*/
+			  set_out(OUT_PUMPS, 0);
+			  set_out(OUT_FAN_BAT, 0);
+			  set_out(OUT_FAN_MOT, 0);
+
+	  		  /*OUT control OFF*/
+
+	  		  /*TODO save distance to EEPROM */
+	  		  break;
+	  	  case INST_ERR:
+	  	  default:
+	  		  break;
+	  }
 	  if(period_1)
 	  {
+		  get_lp_voltage();
 		  StepperMot_step(&stepper2);
 		  period_1 = 0;
+
+
+		  CAN_state1 = HAL_CAN_GetState(&hcan1);
 	  }
 	  if(period_10)
 	  {
@@ -272,53 +492,29 @@ int main(void)
 		  if(sw1_pressed == 0 && HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin))
 		  {
 			  sw1_pressed = 1;
-			  drive_mode = drive_mode >= 6 ? 0 : drive_mode+1;
+			  L_button();
 		  }
-		  else if(HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin) == 0)
-		  {
-			  sw1_pressed = 0;
-		  }
+		  else if(HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin) == 0)sw1_pressed = 0;
+
 		  if(sw2_pressed == 0 && HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin))
-		  		  {
-		  			  sw2_pressed = 1;
-		  			  HAL_GPIO_TogglePin(Backlight_GPIO_Port, Backlight_Pin);
-		  		  }
-		  		  else if(HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin) == 0)
-		  		  {
-		  			  sw2_pressed = 0;
-		  		  }
+		  {
+		  	  sw2_pressed = 1;
+		  	  R_button();
+		  }
+		  else if(HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin) == 0) sw2_pressed = 0;
+
 		  period_10 = 0;
 	  }
 	  if(period_100)
-	  {
-		  spip_send_word(0xAF07);
+{
 
 		  period_100 = 0;
 	  }
 	  if(period_1000)
 	  {
-		  display_redraw(M0);
-		/*	 //  snprintf(char_voltage, 3,"%d" , (int)(baseTimer/1000) );
-			  u8g2_ClearBuffer(&u8g2);
-
-			  itoa((int)(baseTimer/1000), char_voltage, 10);
-
-			  u8g2_SetFont(&u8g2, u8g2_font_ncenB08_tr);
-			  u8g2_DrawStr(&u8g2, 5, 15, "Runtime");
-			  u8g2_DrawRBox(&u8g2, 60, 40, 30, 20, 3);// (&u8g2, 10, 60, 0, "Button");
-			  u8g2_DrawStr(&u8g2, 40, 30, char_voltage);
-			  u8g2_DrawStr(&u8g2, 60, 30, "s");
-			  	      //u8g2_DrawCircle(&u8g2, 60, 40, 10, U8G2_DRAW_ALL);
-			  u8g2_UpdateDisplay(&u8g2);
-			  //u8g2_UpdateDisplayArea(&u8g2, 40, 30, 20, );*/
+		  display_redraw();
 		  period_1000 = 0;
 	  }
-
-//
-//		  HAL_Delay(1000);
-//	  u8g2_ClearBuffer(&u8g2);
-//	  u8g2_UpdateDisplay(&u8g2);
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -396,7 +592,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 2;
+  hadc1.Init.NbrOfConversion = 1;
   hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -414,13 +610,14 @@ static void MX_ADC1_Init(void)
   }
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time. 
   */
-  sConfig.Channel = ADC_CHANNEL_12;
+  /*sConfig.Channel = ADC_CHANNEL_12;
   sConfig.Rank = 2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
-  }
+  }*/
   /* USER CODE BEGIN ADC1_Init 2 */
+  HAL_ADC_Start(&hadc1);
 
   /* USER CODE END ADC1_Init 2 */
 
@@ -458,7 +655,7 @@ static void MX_CAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN1_Init 2 */
-
+  HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
   /* USER CODE END CAN1_Init 2 */
 
 }

@@ -28,7 +28,7 @@ static void StepperMot_setOut(s_STEPPER* stepper)
 	/* SET GPIO */
 	for (int i = 0; i < 4; ++i)
 	{
-		HAL_GPIO_WritePin(stepper->port[i], stepper->pin[i], stepper->pin_state);
+		HAL_GPIO_WritePin(stepper->port[i], stepper->pin[i], (stepper->pin_state>>i) & 0x01);
 	}
 }
 
@@ -55,19 +55,24 @@ void StepperMot_step(s_STEPPER* stepper)
 		return;
 	}
 	//forward
-	else if(((stepper->wPosition > stepper->position) && (stepper->direction == FORWARD)) ||
-			((stepper->wPosition < stepper->position) && (stepper->direction == BACKWARD)))
+	else if(stepper->wPosition > stepper->position)
 	{
 		stepper->at_position = 0;
 		stepper->position++;
-		stepper->step = stepper->step < 7 ? stepper->step+1 : 0;
+		if(stepper->direction == FORWARD)
+			stepper->step = stepper->step < 7 ? stepper->step+1 : 0;
+		else
+			stepper->step = stepper->step > 0 ? stepper->step-1 : 7;
 	}
 	//backward
 	else
 	{
 		stepper->at_position = 0;
 		stepper->position--;
-		stepper->step = stepper->step > 0 ? stepper->step-1 : 7;
+		if(stepper->direction == FORWARD)
+			stepper->step = stepper->step > 0 ? stepper->step-1 : 7;
+		else
+			stepper->step = stepper->step < 7 ? stepper->step+1 : 0;
 	}
 
 	StepperMot_setOut(stepper);
