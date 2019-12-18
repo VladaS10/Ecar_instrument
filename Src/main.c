@@ -206,9 +206,9 @@ void set_indicator(LED_INDICATOR indicator, uint8_t ind_enable)
 
 void get_lp_voltage()
 {
-	if(HAL_ADC_GetValue(&hadc1) < 1900) lp_batt_volt = 0;
+	if(HAL_ADC_GetValue(&hadc1) < 100) lp_batt_volt = 0;
 	else
-		lp_batt_volt = (10 * HAL_ADC_GetValue(&hadc1) - 18120)/104;
+		lp_batt_volt = (10 * HAL_ADC_GetValue(&hadc1) - 0)/2210;
 }
 
 
