@@ -94,16 +94,27 @@ u8g2_t u8g2;
 uint64_t baseTimer = 0;
 uint8_t period_1, period_10, period_100, period_1000;
 uint8_t sw1_pressed = 0, sw2_pressed = 0;
-uint32_t odo_dist = 12340, trip_dist = 2500;
 uint8_t drive_mode = 0;
 DISP_MODE display_mode = DISP_M0;
 
+/* BATTERY */
 uint16_t hp_batt_tem_C = 0;
 uint16_t hp_batt_volt = 0;
 uint16_t hp_batt_perc = 0;
 
 uint16_t lp_batt_volt = 0; /*OK 12-15V 0.1V*/
+#define LVB_LOW_OFF 50
+#define LVB_CHAR_LO 125
+#define LVB_CHAR_HI 130
 
+/*DISTANCE AND SPEED*/
+#define DIST_DIV_CONST 36000
+#define SPEED_DIV_CONST 36000
+uint16_t veh_speed = 0;
+uint32_t odo_dist = 12340000, trip_dist = 2500000;
+
+
+/* CHARACTER ARRAYS */
 char univ_string4[] = "1234";
 char univ_string6[] = "123456";
 
@@ -139,12 +150,19 @@ void R_button() /*OK*/
 	if(display_mode > DISP_M2) display_mode = DISP_M0;
 }
 
+void set_pointers_positions()
+{
+  stepper1.wPosition = (MOTOR_POWER + 800)/80;
+  stepper2.wPosition = veh_speed * 1;
+  stepper3.wPosition = (HV_BAT_VOLT * 80)/4000;
+
+}
+
 #define OUT_BAT400 	2
 #define OUT_REL400 	1
 #define OUT_FAN_BAT	5
 #define OUT_FAN_MOT 4
 #define OUT_PUMPS	3
-
 
 void set_out(uint8_t out_nr, uint8_t out_enable)
 {
@@ -300,9 +318,9 @@ void display_redraw()
 	u8g2_DrawStr(&u8g2, 02, DISP_LINE1_Y + DISP_TRIP_size, "TRIP");
 	u8g2_DrawStr(&u8g2, 02, DISP_LINE2_Y + DISP_ODO_size, "ODO");
 	u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
-	fp2str(char_trip, trip_dist, 1, 6, '0');
+	fp2str(char_trip, (trip_dist/DIST_DIV_CONST), 1, 6, '0');
 	u8g2_DrawStr(&u8g2, 60, DISP_LINE1_Y + DISP_TRIP_size, char_trip);
-	int2str(char_odo, odo_dist, 6, '0');
+	int2str(char_odo, (odo_dist/DIST_DIV_CONST), 6, '0');
 	u8g2_DrawStr(&u8g2, 60, DISP_LINE2_Y + DISP_ODO_size, char_odo);
 	u8g2_UpdateDisplay(&u8g2);
 }
@@ -354,7 +372,7 @@ int main(void)
   u8g2_InitDisplay(&u8g2);
   u8g2_SetPowerSave(&u8g2, 0);
 
-  if(lp_batt_volt < 50) inst_state = INST_CHARGE;
+  if(lp_batt_volt < LVB_LOW_OFF) inst_state = INST_CHARGE;
 
   if(inst_state == INST_INIT)
   {
@@ -434,10 +452,12 @@ int main(void)
 	  		  set_out(OUT_BAT400, 1); /*HP battery switch ON*/
 	  		  set_out(OUT_PUMPS, 1);  /*OUT control - cooling*/
 
-	  		  if(lp_batt_volt < 125) set_indicator(LED_CHARGING_ERROR, 1);
-	  		  else set_indicator(LED_CHARGING_ERROR, 0);
+	  		  if(period_10) set_pointers_positions();
 
-	  		  if(lp_batt_volt < 50) inst_state = INST_OFF;
+	  		  if(lp_batt_volt < LVB_CHAR_LO) set_indicator(LED_CHARGING_ERROR, 1);
+	  		  else if(lp_batt_volt > LVB_CHAR_HI)set_indicator(LED_CHARGING_ERROR, 0);
+
+	  		  if(lp_batt_volt < LVB_LOW_OFF) inst_state = INST_OFF;
 
 	  		  break;
 	  	  case INST_CHARGE:
@@ -506,8 +526,10 @@ int main(void)
 		  period_10 = 0;
 	  }
 	  if(period_100)
-{
-
+	    {
+	      veh_speed = VEHICLE_SPEED;
+		odo_dist += veh_speed;
+		trip_dist += veh_speed;
 		  period_100 = 0;
 	  }
 	  if(period_1000)

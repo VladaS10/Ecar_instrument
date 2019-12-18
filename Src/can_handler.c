@@ -15,12 +15,12 @@ uint16_t get_word_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos)
 
 int16_t convert_CAN_temp(uint8_t temp_byte)
 {
-  return (temp_byte - 40);
+  return ((int16_t)temp_byte - 40);
 }
 
 uint16_t convert_CAN_percent(uint8_t percent_byte)
 {
-  return (percent_byte * 4);
+  return ((uint16_t)percent_byte * 4);
 }
 
 uint16_t convert_CAN_power(uint16_t power_word)

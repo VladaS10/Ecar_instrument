@@ -144,6 +144,8 @@
 #define MOTOR_POWER (convert_CAN_power(get_word_CAN_RX(0x116,2)))
 #define MOTOR_TORQ (convert_CAN_power(get_word_CAN_RX(0x116,0)))
 
+#define VEHICLE_SPEED (get_word_CAN_RX(0x115,2))
+
 #define HV_BAT_VOLT (convert_CAN_HV(get_word_CAN_RX(0x119,0)))
 #define HV_BAT_CURR (convert_CAN_HV(get_word_CAN_RX(0x119,2)))
 #define LV_BAT_VOLT (convert_CAN_HV(get_byte_CAN_RX(0x119,4)))
