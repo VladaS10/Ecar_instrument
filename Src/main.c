@@ -226,7 +226,7 @@ void get_lp_voltage()
 {
 	if(HAL_ADC_GetValue(&hadc1) < 100) lp_batt_volt = 0;
 	else
-		lp_batt_volt = (10 * HAL_ADC_GetValue(&hadc1) - 0)/2210;
+		lp_batt_volt = (10 * HAL_ADC_GetValue(&hadc1) - 0)/221;
 }
 
 
@@ -528,12 +528,13 @@ int main(void)
 	  if(period_100)
 	    {
 	      veh_speed = VEHICLE_SPEED;
-		odo_dist += veh_speed;
-		trip_dist += veh_speed;
+	      odo_dist += veh_speed;
+	      trip_dist += veh_speed;
 		  period_100 = 0;
 	  }
 	  if(period_1000)
 	  {
+		  drive_mode = DRIVE_MODE;
 		  display_redraw();
 		  period_1000 = 0;
 	  }
@@ -677,7 +678,22 @@ static void MX_CAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN1_Init 2 */
-  HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+  CAN_FilterTypeDef  sFilterConfig;
+
+  sFilterConfig.FilterBank = 0;
+  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
+  sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
+  sFilterConfig.FilterIdHigh = 0x0000;
+  sFilterConfig.FilterIdLow = 0x0000;
+  sFilterConfig.FilterMaskIdHigh = 0x0000;
+  sFilterConfig.FilterMaskIdLow = 0x0000;
+  sFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
+  sFilterConfig.FilterActivation = ENABLE;
+  sFilterConfig.SlaveStartFilterBank = 14;
+
+  HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig);
+
+  HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_RX_FIFO1_MSG_PENDING);
   HAL_CAN_Start(&hcan1);
   /* USER CODE END CAN1_Init 2 */
 

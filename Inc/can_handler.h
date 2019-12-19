@@ -137,6 +137,8 @@
 #define CAN_RX_COUNT 12
 
 /*All values in format 1234.5 */
+#define DRIVE_MODE (get_byte_CAN_RX(0x108,0))
+
 #define BRAKE_PEDAL_PRESSED (get_byte_CAN_RX(0x117,5))
 #define MOTOR_TEMP (convert_CAN_temp(get_byte_CAN_RX(0x506,2)))
 #define INVERT_TEMP (convert_CAN_temp(get_byte_CAN_RX(0x506,1)))
