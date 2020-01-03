@@ -108,10 +108,14 @@ uint16_t lp_batt_volt = 0; /*OK 12-15V 0.1V*/
 #define LVB_CHAR_HI 130
 
 /*DISTANCE AND SPEED*/
-#define DIST_DIV_CONST 36000
-#define SPEED_DIV_CONST 36000
+//#define DIST_DIV_CONST 57600
+#define TRIP_DIV_CONST 57600
+#define ODO_DIV_CONST 58
+#define ODO_LOW_DIV 1000
+#define SPEED_DIV_CONST 57600
 uint16_t veh_speed = 0;
-uint32_t odo_dist = 12340000, trip_dist = 2500000;
+uint32_t odo_dist = 0, trip_dist = 0; /*ODO is divided by 1000 */
+uint32_t odo_low = 0;
 
 
 /* CHARACTER ARRAYS */
@@ -318,9 +322,9 @@ void display_redraw()
 	u8g2_DrawStr(&u8g2, 02, DISP_LINE1_Y + DISP_TRIP_size, "TRIP");
 	u8g2_DrawStr(&u8g2, 02, DISP_LINE2_Y + DISP_ODO_size, "ODO");
 	u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
-	fp2str(char_trip, (trip_dist/DIST_DIV_CONST), 1, 6, '0');
+	fp2str(char_trip, (trip_dist/TRIP_DIV_CONST), 1, 6, '0');
 	u8g2_DrawStr(&u8g2, 60, DISP_LINE1_Y + DISP_TRIP_size, char_trip);
-	int2str(char_odo, (odo_dist/DIST_DIV_CONST), 6, '0');
+	int2str(char_odo, (odo_dist/ODO_DIV_CONST), 6, '0');
 	u8g2_DrawStr(&u8g2, 60, DISP_LINE2_Y + DISP_ODO_size, char_odo);
 	u8g2_UpdateDisplay(&u8g2);
 }
@@ -365,6 +369,11 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
+
+  /*Load distance*/
+  HAL_I2C_Mem_Read(&hi2c1, 0xA0, 0, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&trip_dist, 4, 1000);
+  HAL_I2C_Mem_Read(&hi2c1, 0xA0, 0, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&odo_dist, 4, 1000);
+
   HAL_Delay(100);
   get_lp_voltage();
 
@@ -423,6 +432,7 @@ int main(void)
   HAL_GPIO_WritePin(Disp_backlight_GPIO_Port,Disp_backlight_Pin,GPIO_PIN_SET); //LCD backlight
 
 
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -476,20 +486,22 @@ int main(void)
 	  		  HAL_GPIO_WritePin(Disp_backlight_GPIO_Port,Disp_backlight_Pin,GPIO_PIN_RESET); //LCD backlight
 	  		  //HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_RESET); //backlight
 
+	  		  /*Save distance*/
+	  		  HAL_I2C_Mem_Write(&hi2c1, 0xA0, 0, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&trip_dist, 4, 1000);
+	  		  HAL_I2C_Mem_Write(&hi2c1, 0xA0, 0, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&odo_dist, 4, 1000);
+
 	  		  /*steppers to 0 */
 	  		  stepper1.wPosition = 0;
 	  		  stepper2.wPosition = 0;
 	  		  stepper3.wPosition = 0;
 
+	  		  /*OUT control OFF*/
 	  		  set_out(OUT_REL400, 0);/*motor relay OFF*/
 			  set_out(OUT_BAT400, 0);/*HP battery switch OFF*/
 			  set_out(OUT_PUMPS, 0);
 			  set_out(OUT_FAN_BAT, 0);
 			  set_out(OUT_FAN_MOT, 0);
 
-	  		  /*OUT control OFF*/
-
-	  		  /*TODO save distance to EEPROM */
 	  		  break;
 	  	  case INST_ERR:
 	  	  default:
@@ -528,8 +540,13 @@ int main(void)
 	  if(period_100)
 	    {
 	      veh_speed = VEHICLE_SPEED;
-	      odo_dist += veh_speed;
 	      trip_dist += veh_speed;
+	      odo_low += veh_speed;
+	      if(odo_low > ODO_LOW_DIV)
+	      {
+	    	  odo_dist += odo_low / ODO_LOW_DIV;
+	    	  odo_low = odo_low % ODO_LOW_DIV; //keep only the rest
+	      }
 		  period_100 = 0;
 	  }
 	  if(period_1000)
