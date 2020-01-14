@@ -44,9 +44,12 @@ uint16_t can_id_table[CAN_RX_COUNT] =
   0x120, /* power data 1 - max power*/
   0x121, /* power data 2 - min max HV */
   0x122, /* torque limits % */
-  0x125,  /* pedal position */
+  0x125,  /* accelerator position */
   0x506, /* temperature 1*/
-  0x514 /* temperature 2*/
+  0x514, /* temperature 2*/
+  0x600, /* Battery capacity */ /*TODO*/
+  0x601, /* Battery temperature */
+  0x602  /* Battery power available */
 };
 
 

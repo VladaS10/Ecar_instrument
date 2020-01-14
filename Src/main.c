@@ -107,6 +107,13 @@ uint16_t lp_batt_volt = 0; /*OK 12-15V 0.1V*/
 #define LVB_CHAR_LO 125
 #define LVB_CHAR_HI 130
 
+/* MOTOR */
+#define MOT_MAX_POWER 350
+#define MOT_MAX_REGEN 80
+uint16_t mot_max_power = 500;
+uint16_t mot_max_regen = 300;
+
+
 /*DISTANCE AND SPEED*/
 //#define DIST_DIV_CONST 57600
 #define TRIP_DIV_CONST 57600
@@ -145,8 +152,8 @@ static void MX_SPI1_Init(void);
 
 void L_button()
 {
-	trip_dist = 0;
 	if(sw2_pressed)	HAL_GPIO_TogglePin(Backlight_GPIO_Port, Backlight_Pin);
+	else trip_dist = 0;
 }
 void R_button() /*OK*/
 {
@@ -283,23 +290,42 @@ void display_redraw()
 		// default
 		case DISP_M0:
 			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
-			u8g2_DrawStr(&u8g2, 30, 20, "Mode1");
-			draw_bargraph(30,hp_batt_tem_C,"  0%","100%");
+			u8g2_DrawStr(&u8g2, 8, 10, "Batt temp");
+			u8g2_DrawStr(&u8g2, 50, 20, "°C");
+
+			u8g2_DrawStr(&u8g2, 3, 30, "Batt charge");
+			u8g2_DrawStr(&u8g2, 55, 40, "%");
+
+			u8g2_DrawStr(&u8g2, 70, 10, "Max power");
+			u8g2_DrawStr(&u8g2, 105, 20, "kW");
+
+			u8g2_DrawStr(&u8g2, 70, 30, "Max regen.");
+			u8g2_DrawStr(&u8g2, 105, 40, "kW");
 			break;
 		// Mode1 - battery
 		case DISP_M1:
 			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
-			u8g2_DrawStr(&u8g2, 30, 20, "Mode2");
+			//u8g2_DrawStr(&u8g2, 30, 20, "Mode2");
+			u8g2_DrawStr(&u8g2, 40, 10, "Batt temp °C");
+			draw_bargraph(12, hp_batt_tem_C, "    0", " 60");
 
-			u8g2_DrawStr(&u8g2, 60, 38, "V");
-			fp2str(univ_string6, lp_batt_volt, 1, 6, ' ');
-			u8g2_DrawStr(&u8g2, 30, 38, univ_string6);
+			u8g2_DrawStr(&u8g2, 35, 30, "Batt charge %");
+			draw_bargraph(32, hp_batt_perc, "    0", " 100");
 
+			//u8g2_DrawStr(&u8g2, 60, 38, "V");
+			//fp2str(univ_string6, lp_batt_volt, 1, 6, ' ');
+			//u8g2_DrawStr(&u8g2, 30, 38, univ_string6);
 			break;
 		// Mode2 - power settings
 		case DISP_M2:
 			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
-			u8g2_DrawStr(&u8g2, 30, 20, "Mode3");
+			u8g2_DrawStr(&u8g2, 25, 10, "Max power  kW");
+			draw_bargraph(12, (mot_max_power*10)/MOT_MAX_POWER, "   30", " 350");
+
+			u8g2_DrawStr(&u8g2, 25, 30, "Max regen.  kW");
+			draw_bargraph(32, (mot_max_regen*10)/MOT_MAX_REGEN, "    0", " 80");
+			//u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
+			//u8g2_DrawStr(&u8g2, 30, 20, "Mode3");
 			break;
 		case DISP_Mcharge: /*OK*/
 			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
@@ -544,13 +570,16 @@ int main(void)
 	      odo_low += veh_speed;
 	      if(odo_low > ODO_LOW_DIV)
 	      {
-	    	  odo_dist += odo_low / ODO_LOW_DIV;
+	    	  odo_dist += (odo_low / ODO_LOW_DIV);
 	    	  odo_low = odo_low % ODO_LOW_DIV; //keep only the rest
 	      }
 		  period_100 = 0;
 	  }
 	  if(period_1000)
 	  {
+		  //mot_max_power = MAX_DISCH_POW;
+		  //mot_max_regen = MAX_REGEN_POW;
+
 		  drive_mode = DRIVE_MODE;
 		  display_redraw();
 		  period_1000 = 0;

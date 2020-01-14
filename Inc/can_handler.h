@@ -134,7 +134,7 @@
 #include "main.h"
 
 
-#define CAN_RX_COUNT 12
+#define CAN_RX_COUNT 15
 
 /*All values in format 1234.5 */
 #define DRIVE_MODE (get_byte_CAN_RX(0x108,0))
