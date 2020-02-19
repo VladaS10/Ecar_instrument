@@ -152,8 +152,8 @@
 #define HV_BAT_CURR (convert_CAN_HV(get_word_CAN_RX(0x119,2)))
 #define LV_BAT_VOLT (convert_CAN_HV(get_byte_CAN_RX(0x119,4)))
 
-#define MAX_REGEN_POW (get_word_CAN_RX(0x120,4))
-#define MAX_DISCH_POW (get_word_CAN_RX(0x120,6))
+#define MAX_REGEN_POW (convert_CAN_percent(get_word_CAN_RX(0x122,0)))
+#define MAX_DISCH_POW (convert_CAN_percent(get_word_CAN_RX(0x122,1)))
 
 #define MAX_HV_VOLT (get_word_CAN_RX(0x121,2))
 #define MIN_HV_VOLT (get_word_CAN_RX(0x121,0))

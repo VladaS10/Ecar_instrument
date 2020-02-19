@@ -47,6 +47,8 @@ void StepperMot_reset(s_STEPPER* stepper)
 /* makes one step closer to wanted position */
 void StepperMot_step(s_STEPPER* stepper)
 {
+	//maximum position
+	if(stepper->wPosition > stepper->max_position) stepper->wPosition = stepper->max_position;
 	//wanted position
 	if(stepper->wPosition == stepper->position ||
 			stepper->direction == STOP)

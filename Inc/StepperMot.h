@@ -20,6 +20,7 @@ typedef struct
 {
 	uint16_t position;
 	uint16_t wPosition;
+	uint16_t max_position;
 	uint8_t at_position;
 	uint8_t step;
 	uint8_t microstep;

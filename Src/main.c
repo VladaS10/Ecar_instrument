@@ -30,6 +30,7 @@
 #include "u8g2.h"
 #include "SPI_parallel.h"
 #include "can_handler.h"
+#include "mov_avg.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -119,10 +120,16 @@ uint16_t mot_max_regen = 300;
 #define TRIP_DIV_CONST 57600
 #define ODO_DIV_CONST 58
 #define ODO_LOW_DIV 1000
-#define SPEED_DIV_CONST 57600
+#define TRIP_EEPROM_ADD 10
+#define ODO_EEPROM_ADD 20
 uint16_t veh_speed = 0;
 uint32_t odo_dist = 0, trip_dist = 0; /*ODO is divided by 1000 */
 uint32_t odo_low = 0;
+
+#define SPEED_DIV_CONST 57600
+#define VEH_SPEED_SAMPLES 10
+s_MOV_AVG_32 veh_speed_avg;
+uint32_t veh_speed_buf[VEH_SPEED_SAMPLES];
 
 
 /* CHARACTER ARRAYS */
@@ -150,12 +157,12 @@ static void MX_SPI1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void L_button()
+void R_button()
 {
-	if(sw2_pressed)	HAL_GPIO_TogglePin(Backlight_GPIO_Port, Backlight_Pin);
+	if(sw1_pressed)	HAL_GPIO_TogglePin(Backlight_GPIO_Port, Backlight_Pin);
 	else trip_dist = 0;
 }
-void R_button() /*OK*/
+void L_button() /*OK*/
 {
 	display_mode++;
 	if(display_mode > DISP_M2) display_mode = DISP_M0;
@@ -163,7 +170,7 @@ void R_button() /*OK*/
 
 void set_pointers_positions()
 {
-  stepper1.wPosition = (MOTOR_POWER + 800)/80;
+  stepper1.wPosition = (MOTOR_POWER + 720)/80;
   stepper2.wPosition = veh_speed * 1;
   stepper3.wPosition = (HV_BAT_VOLT * 80)/4000;
 
@@ -262,7 +269,7 @@ void fp2str(char* array, int32_t number, uint8_t point_pos, uint32_t a_length, c
 		{
 			array[i-1] = '.';
 		}
-		else if(number == 0 && i < a_length ) array[i-1] = fill_char;
+		else if(number == 0 && i < a_length-point_pos-1) array[i-1] = fill_char;
 		else
 		{
 			array[i-1] = (number % 10) + '0';
@@ -298,9 +305,13 @@ void display_redraw()
 
 			u8g2_DrawStr(&u8g2, 70, 10, "Max power");
 			u8g2_DrawStr(&u8g2, 105, 20, "kW");
+			fp2str(univ_string6, 4*MAX_DISCH_POW, 1, 6, ' ');
+			u8g2_DrawStr(&u8g2, 75, 20, univ_string6);
 
 			u8g2_DrawStr(&u8g2, 70, 30, "Max regen.");
 			u8g2_DrawStr(&u8g2, 105, 40, "kW");
+			fp2str(univ_string6, (4*MAX_REGEN_POW)/5, 1, 6, ' ');
+			u8g2_DrawStr(&u8g2, 75, 40, univ_string6);
 			break;
 		// Mode1 - battery
 		case DISP_M1:
@@ -320,10 +331,10 @@ void display_redraw()
 		case DISP_M2:
 			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
 			u8g2_DrawStr(&u8g2, 25, 10, "Max power  kW");
-			draw_bargraph(12, (mot_max_power*10)/MOT_MAX_POWER, "   30", " 350");
+			draw_bargraph(12, (MAX_DISCH_POW/10), "    0", " 400");
 
 			u8g2_DrawStr(&u8g2, 25, 30, "Max regen.  kW");
-			draw_bargraph(32, (mot_max_regen*10)/MOT_MAX_REGEN, "    0", " 80");
+			draw_bargraph(32, (MAX_REGEN_POW/10), "    0", " 80");
 			//u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
 			//u8g2_DrawStr(&u8g2, 30, 20, "Mode3");
 			break;
@@ -361,7 +372,7 @@ void display_redraw()
   * @retval int
   */
 
-HAL_CAN_StateTypeDef CAN_state1;
+//HAL_CAN_StateTypeDef CAN_state1;
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -376,6 +387,7 @@ int main(void)
 
   /* USER CODE BEGIN Init */
   INSTRUMENT_STATE inst_state = INST_INIT;
+  xv_mov_avg_init(&veh_speed_avg, veh_speed_buf, VEH_SPEED_SAMPLES);
 
   /* USER CODE END Init */
 
@@ -397,8 +409,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /*Load distance*/
-  HAL_I2C_Mem_Read(&hi2c1, 0xA0, 0, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&trip_dist, 4, 1000);
-  HAL_I2C_Mem_Read(&hi2c1, 0xA0, 0, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&odo_dist, 4, 1000);
+  HAL_I2C_Mem_Read(&hi2c1, 0xA0, TRIP_EEPROM_ADD, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&trip_dist, 4, 1000);
+  HAL_I2C_Mem_Read(&hi2c1, 0xA0, ODO_EEPROM_ADD, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&odo_dist, 4, 1000);
+  //odo_dist = ODO_DIV_CONST;
 
   HAL_Delay(100);
   get_lp_voltage();
@@ -421,6 +434,7 @@ int main(void)
 	  stepper1.port[3] = GPIOB;
 	  stepper1.pin[3] = GPIO_PIN_0;
 	  stepper1.direction = FORWARD;
+	  stepper1.max_position = 100;
 	  StepperMot_init(&stepper1, 20);
 
 	  stepper2.port[0] = GPIOE;
@@ -432,6 +446,7 @@ int main(void)
 	  stepper2.port[3] = GPIOA;
 	  stepper2.pin[3] = GPIO_PIN_7;
 	  stepper2.direction = FORWARD;
+	  stepper2.max_position = 1000;
 	  StepperMot_init(&stepper2, 100);
 
 	  stepper3.port[0] = GPIOC;
@@ -443,6 +458,7 @@ int main(void)
 	  stepper3.port[3] = GPIOB;
 	  stepper3.pin[3] = GPIO_PIN_15;
 	  stepper3.direction = BACKWARD;
+	  stepper3.max_position = 100;
 	  StepperMot_init(&stepper3, 20);
 
 		  //set LEDS ON
@@ -454,7 +470,6 @@ int main(void)
 		  HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_SET);
 		  HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_SET); //backlight
   }
-
   HAL_GPIO_WritePin(Disp_backlight_GPIO_Port,Disp_backlight_Pin,GPIO_PIN_SET); //LCD backlight
 
 
@@ -479,9 +494,24 @@ int main(void)
 				  HAL_GPIO_WritePin(D6_G_GPIO_Port,D6_G_Pin,GPIO_PIN_RESET);
 			  }
 	  		  break;
-	  	  case INST_DRIVE:
-	  		  /*TODO DRIVE MODE*/
-	  		  /*LED control*/
+	  	  case INST_DRIVE:/* DRIVE MODE*/
+	  		  /* TODO LED control*/
+	  		  /*Parking LED*/
+	  		  set_indicator(LED_PARKING, drive_mode == 0);
+	  		  /*Brake pedal LED*/
+	  		  if((drive_mode == 0 || drive_mode == 2) && veh_speed == 0)
+	  		  {
+	  			  if(BRAKE_PEDAL_PRESSED) set_indicator(LED_PARKING, 0);
+	  			  else set_indicator(LED_PARKING, 1);
+	  		  }
+	  		  /*Low battery LED*/
+	  		  if(lp_batt_volt < LVB_CHAR_LO) set_indicator(LED_CHARGING_ERROR, 1);
+	  		  else if(lp_batt_volt > LVB_CHAR_HI)set_indicator(LED_CHARGING_ERROR, 0);
+
+				/*LED_CHARGING_ERROR,*/
+				/*LED_OVERHEAT*/
+				/*LED_CHECK_ENGINE*/
+
 
 
 	  		  set_out(OUT_REL400, 1);  /*motor relay ON*/
@@ -489,10 +519,6 @@ int main(void)
 	  		  set_out(OUT_PUMPS, 1);  /*OUT control - cooling*/
 
 	  		  if(period_10) set_pointers_positions();
-
-	  		  if(lp_batt_volt < LVB_CHAR_LO) set_indicator(LED_CHARGING_ERROR, 1);
-	  		  else if(lp_batt_volt > LVB_CHAR_HI)set_indicator(LED_CHARGING_ERROR, 0);
-
 	  		  if(lp_batt_volt < LVB_LOW_OFF) inst_state = INST_OFF;
 
 	  		  break;
@@ -513,8 +539,8 @@ int main(void)
 	  		  //HAL_GPIO_WritePin(Backlight_GPIO_Port, Backlight_Pin, GPIO_PIN_RESET); //backlight
 
 	  		  /*Save distance*/
-	  		  HAL_I2C_Mem_Write(&hi2c1, 0xA0, 0, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&trip_dist, 4, 1000);
-	  		  HAL_I2C_Mem_Write(&hi2c1, 0xA0, 0, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&odo_dist, 4, 1000);
+	  		  HAL_I2C_Mem_Write(&hi2c1, 0xA0, TRIP_EEPROM_ADD, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&trip_dist, 4, 1000);
+	  		  HAL_I2C_Mem_Write(&hi2c1, 0xA0, ODO_EEPROM_ADD, I2C_MEMADD_SIZE_16BIT, (uint8_t*)&odo_dist, 4, 1000);
 
 	  		  /*steppers to 0 */
 	  		  stepper1.wPosition = 0;
@@ -538,9 +564,7 @@ int main(void)
 		  get_lp_voltage();
 		  StepperMot_step(&stepper2);
 		  period_1 = 0;
-
-
-		  CAN_state1 = HAL_CAN_GetState(&hcan1);
+		  //CAN_state1 = HAL_CAN_GetState(&hcan1);
 	  }
 	  if(period_10)
 	  {
@@ -565,7 +589,7 @@ int main(void)
 	  }
 	  if(period_100)
 	    {
-	      veh_speed = VEHICLE_SPEED;
+	      veh_speed = xu32_mov_avg_add(&veh_speed_avg, VEHICLE_SPEED);
 	      trip_dist += veh_speed;
 	      odo_low += veh_speed;
 	      if(odo_low > ODO_LOW_DIV)

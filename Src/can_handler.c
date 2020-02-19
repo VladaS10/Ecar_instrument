@@ -9,7 +9,7 @@ uint8_t get_byte_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos)
 uint16_t get_word_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos)
 {
    uint8_t* b_point = &can_data_received[get_CANID_index(CAN_ID)][byte_pos];
-   return (b_point[0] + (((uint16_t)b_point[1]) << 8));
+   return (b_point[1] + (((uint16_t)b_point[0]) << 8));
 }
 
 
