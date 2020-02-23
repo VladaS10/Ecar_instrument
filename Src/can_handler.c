@@ -47,9 +47,22 @@ uint16_t can_id_table[CAN_RX_COUNT] =
   0x125,  /* accelerator position */
   0x506, /* temperature 1*/
   0x514, /* temperature 2*/
-  0x600, /* Battery capacity */ /*TODO*/
-  0x601, /* Battery temperature */
-  0x602  /* Battery power available */
+  0x301, /* Battery U, I, CH[0.1%], T[C] */
+  0x302, /* Battery U min, U max, Discharge max, Regen max. */
+  0x303  /* Battery binary values
+	   * B0:
+		b0 – charge enable – povoleno nabíjení/rekuperace
+		b1 – discharge enable – povoleno vybíjení
+		b2 – charge immediately – je třeba nabíjet
+		b3 – charging finished – nabíjení ukončeno
+	   * B1:
+		b0 – temperature too high – příliš vysoká teplota – snižuje se vybíjecí/nabíjecí proud
+		b1 – temperature too low – příliš nízká teplota - snižuje se vybíjecí/nabíjecí proud
+		b3 – over temperature – přehřání – dojde k odpojení baterie
+		b4 – under tepmerature – příliš nízká teplota – omezení nabíjení baterie
+		b5 – insulation test failure – selhání izolace
+		b6 – precharge failure – selhání precharge (při pokusu o připojení proud neklesl pod stanovenou hodnotu za stanovený čas)  */
+
 };
 
 

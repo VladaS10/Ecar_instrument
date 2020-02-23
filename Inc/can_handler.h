@@ -160,6 +160,18 @@
 
 #define PEDAL_POS (convert_CAN_percent(get_byte_CAN_RX(0x125,1)))
 
+/*From HI-V BMS */
+/* ID 0x301, 302, 303*/
+#define BMS_BAT_VOLT (get_word_CAN_RX(0x301,0) / 10)
+#define BMS_BAT_CURR (get_word_CAN_RX(0x301,2))
+#define BMS_BAT_CHSTATE (get_word_CAN_RX(0x301,4))
+#define BMS_BAT_TEMP (get_word_CAN_RX(0x301,6))
+#define BMS_BAT_UMIN (get_word_CAN_RX(0x302,0) / 10)
+#define BMS_BAT_UMAX (get_word_CAN_RX(0x302,2) / 10)
+#define BMS_BAT_DISMAX (get_word_CAN_RX(0x302,4))
+#define BMS_BAT_REGMAX (get_word_CAN_RX(0x302,6))
+#define BMS_BAT_BINARY (get_word_CAN_RX(0x303,0))
+
 
 uint8_t can_data_received[CAN_RX_COUNT][8];
 

@@ -300,9 +300,13 @@ void display_redraw()
 			u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
 			u8g2_DrawStr(&u8g2, 8, 10, "Batt temp");
 			u8g2_DrawStr(&u8g2, 50, 20, "°C");
+			fp2str(univ_string6, hp_batt_tem_C, 1, 6, ' ');
+			u8g2_DrawStr(&u8g2, 10, 20, univ_string6);
 
 			u8g2_DrawStr(&u8g2, 3, 30, "Batt charge");
 			u8g2_DrawStr(&u8g2, 55, 40, "%");
+			fp2str(univ_string6, hp_batt_perc, 1, 6, ' ');
+			u8g2_DrawStr(&u8g2, 10, 40, univ_string6);
 
 			u8g2_DrawStr(&u8g2, 70, 10, "Max power");
 			u8g2_DrawStr(&u8g2, 105, 20, "kW");
@@ -605,6 +609,10 @@ int main(void)
 	  {
 		  //mot_max_power = MAX_DISCH_POW;
 		  //mot_max_regen = MAX_REGEN_POW;
+
+		  hp_batt_perc = BMS_BAT_CHSTATE;
+		  hp_batt_tem_C = BMS_BAT_TEMP;
+		  hp_batt_volt = BMS_BAT_VOLT;
 
 		  drive_mode = DRIVE_MODE;
 		  display_redraw();
