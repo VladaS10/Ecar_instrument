@@ -122,12 +122,13 @@ uint16_t mot_max_regen = 300;
 #define ODO_LOW_DIV 1000
 #define TRIP_EEPROM_ADD 10
 #define ODO_EEPROM_ADD 20
-uint16_t veh_speed = 0;
 uint32_t odo_dist = 0, trip_dist = 0; /*ODO is divided by 1000 */
 uint32_t odo_low = 0;
 
 #define SPEED_DIV_CONST 57600
-#define VEH_SPEED_SAMPLES 10
+#define VEH_SPEED_SAMPLES 50
+#define SPEED_TO_POS(spd) (spd*1)
+int16_t veh_speed = 0;
 s_MOV_AVG_32 veh_speed_avg;
 uint32_t veh_speed_buf[VEH_SPEED_SAMPLES];
 
@@ -170,8 +171,8 @@ void L_button() /*OK*/
 
 void set_pointers_positions()
 {
-  stepper1.wPosition = (MOTOR_POWER + 720)/80;
-  stepper2.wPosition = veh_speed * 1;
+  stepper1.wPosition = ((uint16_t)MOTOR_POWER + 720)/80;
+  stepper2.wPosition = SPEED_TO_POS(veh_speed);
   stepper3.wPosition = (HV_BAT_VOLT * 80)/4000;
 
 }
@@ -446,7 +447,7 @@ int main(void)
 	  stepper2.port[3] = GPIOA;
 	  stepper2.pin[3] = GPIO_PIN_7;
 	  stepper2.direction = FORWARD;
-	  stepper2.max_position = 1000;
+	  stepper2.max_position = 800;
 	  StepperMot_init(&stepper2, 100);
 
 	  stepper3.port[0] = GPIOC;
@@ -585,11 +586,12 @@ int main(void)
 		  }
 		  else if(HAL_GPIO_ReadPin(SW2_GPIO_Port, SW2_Pin) == 0) sw2_pressed = 0;
 
+		  veh_speed = xu32_mov_avg_add(&veh_speed_avg, abs(VEHICLE_SPEED));
+
 		  period_10 = 0;
 	  }
 	  if(period_100)
 	    {
-	      veh_speed = xu32_mov_avg_add(&veh_speed_avg, VEHICLE_SPEED);
 	      trip_dist += veh_speed;
 	      odo_low += veh_speed;
 	      if(odo_low > ODO_LOW_DIV)
