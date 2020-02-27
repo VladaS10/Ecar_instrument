@@ -506,8 +506,8 @@ int main(void)
 	  		  /*Brake pedal LED*/
 	  		  if((drive_mode == 0 || drive_mode == 2) && veh_speed == 0)
 	  		  {
-	  			  if(BRAKE_PEDAL_PRESSED) set_indicator(LED_PARKING, 0);
-	  			  else set_indicator(LED_PARKING, 1);
+	  			  if(BRAKE_PEDAL_PRESSED) set_indicator(LED_BRAKE_PEDAL, 0);
+	  			  else set_indicator(LED_BRAKE_PEDAL, 1);
 	  		  }
 	  		  /*Low battery LED*/
 	  		  if(lp_batt_volt < LVB_CHAR_LO) set_indicator(LED_CHARGING_ERROR, 1);
@@ -603,6 +603,13 @@ int main(void)
 	    	  odo_dist += (odo_low / ODO_LOW_DIV);
 	    	  odo_low = odo_low % ODO_LOW_DIV; //keep only the rest
 	      }
+	      /*CAN_TxHeaderTypeDef senth;
+	      senth.DLC = 8;
+	      senth.IDE = CAN_ID_STD;
+	      senth.StdId = 100;
+	      uint32_t mailbox0;
+	      uint8_t txmsg[8] = {0,1,2,3,4,5,6,7};
+	      HAL_CAN_AddTxMessage(&hcan1, &senth, txmsg, &mailbox0);*/
 		  period_100 = 0;
 	  }
 	  if(period_1000)
@@ -761,12 +768,10 @@ static void MX_CAN1_Init(void)
   CAN_FilterTypeDef  sFilterConfig;
 
   sFilterConfig.FilterBank = 0;
-  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
+  sFilterConfig.FilterMode = CAN_FILTERMODE_IDLIST;
   sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
   sFilterConfig.FilterIdHigh = 0x0000;
   sFilterConfig.FilterIdLow = 0x0000;
-  sFilterConfig.FilterMaskIdHigh = 0x0000;
-  sFilterConfig.FilterMaskIdLow = 0x0000;
   sFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
   sFilterConfig.FilterActivation = ENABLE;
   sFilterConfig.SlaveStartFilterBank = 14;
