@@ -24,7 +24,8 @@ typedef struct
 	uint8_t at_position;
 	uint8_t step;
 	uint8_t microstep;
-	int16_t speed;
+	uint16_t next_step;
+	uint16_t period;
 	e_DIRECTION direction;
 	uint16_t pin_state;
 	GPIO_TypeDef* port[4];

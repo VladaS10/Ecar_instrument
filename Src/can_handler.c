@@ -6,7 +6,7 @@ uint8_t get_byte_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos)
   return (can_data_received[get_CANID_index(CAN_ID)][byte_pos]);
 }
 
-uint16_t get_word_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos)
+int16_t get_word_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos)
 {
    uint8_t* b_point = &can_data_received[get_CANID_index(CAN_ID)][byte_pos];
    return (b_point[1] + (((uint16_t)b_point[0]) << 8));
@@ -23,7 +23,7 @@ uint16_t convert_CAN_percent(uint8_t percent_byte)
   return ((uint16_t)percent_byte * 4);
 }
 
-uint16_t convert_CAN_power(uint16_t power_word)
+int16_t convert_CAN_power(int16_t power_word)
 {
   return (power_word * 10) / 4;
 }

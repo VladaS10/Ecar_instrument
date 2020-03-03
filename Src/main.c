@@ -126,8 +126,8 @@ uint32_t odo_dist = 0, trip_dist = 0; /*ODO is divided by 1000 */
 uint32_t odo_low = 0;
 
 #define SPEED_DIV_CONST 57600
-#define VEH_SPEED_SAMPLES 50
-#define SPEED_TO_POS(spd) (spd*1)
+#define VEH_SPEED_SAMPLES 20
+#define SPEED_TO_POS(spd) ((uint32_t)spd*82/100)
 int16_t veh_speed = 0;
 s_MOV_AVG_32 veh_speed_avg;
 uint32_t veh_speed_buf[VEH_SPEED_SAMPLES];
@@ -171,9 +171,9 @@ void L_button() /*OK*/
 
 void set_pointers_positions()
 {
-  stepper1.wPosition = ((uint16_t)MOTOR_POWER + 720)/80;
+  stepper1.wPosition = (int16_t)MOTOR_POWER/146 + 15;
   stepper2.wPosition = SPEED_TO_POS(veh_speed);
-  stepper3.wPosition = (HV_BAT_VOLT * 80)/4000;
+  stepper3.wPosition = (hp_batt_perc / 25);
 
 }
 
@@ -326,7 +326,7 @@ void display_redraw()
 			draw_bargraph(12, hp_batt_tem_C, "    0", " 60");
 
 			u8g2_DrawStr(&u8g2, 35, 30, "Batt charge %");
-			draw_bargraph(32, hp_batt_perc, "    0", " 100");
+			draw_bargraph(32, hp_batt_perc/10, "    0", " 100");
 
 			//u8g2_DrawStr(&u8g2, 60, 38, "V");
 			//fp2str(univ_string6, lp_batt_volt, 1, 6, ' ');
@@ -439,7 +439,8 @@ int main(void)
 	  stepper1.port[3] = GPIOB;
 	  stepper1.pin[3] = GPIO_PIN_0;
 	  stepper1.direction = FORWARD;
-	  stepper1.max_position = 100;
+	  stepper1.max_position = 39;
+	  stepper1.period = 15;
 	  StepperMot_init(&stepper1, 20);
 
 	  stepper2.port[0] = GPIOE;
@@ -451,7 +452,8 @@ int main(void)
 	  stepper2.port[3] = GPIOA;
 	  stepper2.pin[3] = GPIO_PIN_7;
 	  stepper2.direction = FORWARD;
-	  stepper2.max_position = 800;
+	  stepper2.max_position = 820;
+	  stepper2.period = 2;
 	  StepperMot_init(&stepper2, 100);
 
 	  stepper3.port[0] = GPIOC;
@@ -463,7 +465,8 @@ int main(void)
 	  stepper3.port[3] = GPIOB;
 	  stepper3.pin[3] = GPIO_PIN_15;
 	  stepper3.direction = BACKWARD;
-	  stepper3.max_position = 100;
+	  stepper3.max_position = 39;
+	  stepper3.period = 15;
 	  StepperMot_init(&stepper3, 20);
 
 		  //set LEDS ON
@@ -504,10 +507,13 @@ int main(void)
 	  		  /*Parking LED*/
 	  		  set_indicator(LED_PARKING, drive_mode == 0);
 	  		  /*Brake pedal LED*/
-	  		  if((drive_mode == 0 || drive_mode == 2) && veh_speed == 0)
+	  		  if((drive_mode == 0 || drive_mode == 2) && veh_speed == 0 && BRAKE_PEDAL_PRESSED == 0)
 	  		  {
-	  			  if(BRAKE_PEDAL_PRESSED) set_indicator(LED_BRAKE_PEDAL, 0);
-	  			  else set_indicator(LED_BRAKE_PEDAL, 1);
+	  			 set_indicator(LED_BRAKE_PEDAL, 1);
+	  		  }
+	  		  else
+	  		  {
+				set_indicator(LED_BRAKE_PEDAL, 0);
 	  		  }
 	  		  /*Low battery LED*/
 	  		  if(lp_batt_volt < LVB_CHAR_LO) set_indicator(LED_CHARGING_ERROR, 1);
@@ -564,18 +570,30 @@ int main(void)
 	  	  default:
 	  		  break;
 	  }
+	  if(stepper1.next_step)
+	  {
+		  StepperMot_step(&stepper1);
+		  stepper1.next_step = 0;
+	  }
+	  if(stepper2.next_step)
+	  {
+		  StepperMot_step(&stepper2);
+		  stepper2.next_step = 0;
+	  }
+	  if(stepper3.next_step)
+	  {
+		  StepperMot_step(&stepper3);
+		  stepper3.next_step = 0;
+	  }
 	  if(period_1)
 	  {
 		  get_lp_voltage();
-		  StepperMot_step(&stepper2);
+
 		  period_1 = 0;
 		  //CAN_state1 = HAL_CAN_GetState(&hcan1);
 	  }
 	  if(period_10)
 	  {
-		  StepperMot_step(&stepper1);
-		  StepperMot_step(&stepper3);
-
 		  if(sw1_pressed == 0 && HAL_GPIO_ReadPin(SW1_GPIO_Port, SW1_Pin))
 		  {
 			  sw1_pressed = 1;
@@ -768,9 +786,11 @@ static void MX_CAN1_Init(void)
   CAN_FilterTypeDef  sFilterConfig;
 
   sFilterConfig.FilterBank = 0;
-  sFilterConfig.FilterMode = CAN_FILTERMODE_IDLIST;
+  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
   sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
-  sFilterConfig.FilterIdHigh = 0x0000;
+  sFilterConfig.FilterMaskIdHigh = 0;
+  sFilterConfig.FilterMaskIdLow = 0;
+  sFilterConfig.FilterIdHigh = 0x7FFF;
   sFilterConfig.FilterIdLow = 0x0000;
   sFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
   sFilterConfig.FilterActivation = ENABLE;
@@ -989,6 +1009,9 @@ void BaseTimer()
 	 if (baseTimer%10 == 3)		period_10 = 1;
 	 if (baseTimer%100 == 33)	period_100 = 1;
 	 if (baseTimer%1000 == 333)	period_1000 = 1;
+	 if(baseTimer%stepper1.period == 0) stepper1.next_step = 1;
+	 if(baseTimer%stepper2.period == 0) stepper2.next_step = 1;
+	 if(baseTimer%stepper3.period == 0) stepper3.next_step = 1;
 
 }
 

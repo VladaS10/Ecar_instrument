@@ -177,10 +177,10 @@ uint8_t can_data_received[CAN_RX_COUNT][8];
 
 
 uint8_t get_byte_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos);
-uint16_t get_word_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos);
+int16_t get_word_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos);
 int16_t convert_CAN_temp(uint8_t temp_byte);
 uint16_t convert_CAN_percent(uint8_t percent_byte);
-uint16_t convert_CAN_power(uint16_t power_word);
+int16_t convert_CAN_power(int16_t power_word);
 uint16_t convert_CAN_HV(uint16_t power_word);
 
 uint8_t get_CANID_index(uint16_t);
