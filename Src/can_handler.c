@@ -47,7 +47,7 @@ uint16_t can_id_table[CAN_RX_COUNT] =
   0x125,  /* accelerator position */
   0x506, /* temperature 1*/
   0x514, /* temperature 2*/
-  0x301, /* Battery U, I, CH[0.1%], T[C] */
+  0x301, /* Battery U, I, CH[0.1%], T[0,1 C] */
   0x302, /* Battery U min, U max, Discharge max, Regen max. */
   0x303  /* Battery binary values
 	   * B0:
