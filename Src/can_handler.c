@@ -28,7 +28,7 @@ int16_t convert_CAN_power(int16_t power_word)
   return (power_word * 10) / 4;
 }
 
-uint16_t convert_CAN_HV(uint16_t power_word)
+int16_t convert_CAN_HV(int16_t power_word)
 {
   return (power_word * 10) / 8;
 }

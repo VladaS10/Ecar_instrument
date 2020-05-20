@@ -144,6 +144,7 @@
 #define INVERT_TEMP (convert_CAN_temp(get_byte_CAN_RX(0x506,1)))
 
 #define MOTOR_POWER (convert_CAN_power(get_word_CAN_RX(0x116,2)))
+#define MOTOR_CURRENT (convert_CAN_HV(get_word_CAN_RX(0x119,2)))
 #define MOTOR_TORQ (convert_CAN_power(get_word_CAN_RX(0x116,0)))
 
 #define VEHICLE_SPEED (get_word_CAN_RX(0x115,2))
@@ -152,8 +153,8 @@
 #define HV_BAT_CURR (convert_CAN_HV(get_word_CAN_RX(0x119,2)))
 #define LV_BAT_VOLT (convert_CAN_HV(get_byte_CAN_RX(0x119,4)))
 
-#define MAX_REGEN_POW (convert_CAN_percent(get_byte_CAN_RX(0x122,0)))
-#define MAX_DISCH_POW (convert_CAN_percent(get_byte_CAN_RX(0x122,1)))
+#define MAX_REGEN_POW (get_word_CAN_RX(0x120,4))
+#define MAX_DISCH_POW (get_word_CAN_RX(0x120,6))
 
 #define MAX_HV_VOLT (get_word_CAN_RX(0x121,2))
 #define MIN_HV_VOLT (get_word_CAN_RX(0x121,0))
@@ -181,7 +182,7 @@ int16_t get_word_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos);
 int16_t convert_CAN_temp(uint8_t temp_byte);
 uint16_t convert_CAN_percent(uint8_t percent_byte);
 int16_t convert_CAN_power(int16_t power_word);
-uint16_t convert_CAN_HV(uint16_t power_word);
+int16_t convert_CAN_HV(int16_t power_word);
 
 uint8_t get_CANID_index(uint16_t);
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan);

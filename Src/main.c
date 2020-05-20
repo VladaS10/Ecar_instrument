@@ -108,17 +108,17 @@ uint16_t lp_batt_volt = 0; /*OK 12-15V 0.1V*/
 
 /* TEMPERATURES */
 #define HP_BAT_PUMP 	400 /* 40 C */
-#define MOT_PUMP 		500 /* 50 C */
+#define MOT_PUMP 		50 /* 50 C */
 #define HP_BAT_COOL 	350 /* 40 C */
-#define MOT_COOL 		400 /* 40 C */
+#define MOT_COOL 		40 /* 40 C */
 #define HP_BAT_TEMP_MAX	580
-#define MOT_TEMP_MAX	890
+#define MOT_TEMP_MAX	89
 
 #define HP_BAT_FAN_ON 	450
 #define HP_BAT_FAN_OFF	420
 
-#define MOT_FAN_ON 		650
-#define MOT_FAN_OFF		500
+#define MOT_FAN_ON 		75
+#define MOT_FAN_OFF		50
 
 
 /* MOTOR */
@@ -183,7 +183,10 @@ void L_button() /*OK*/
 }
 
 void set_pointers_positions() {
-	stepper1.wPosition = (int16_t) MOTOR_POWER / 146 + 15;
+	//stepper1.wPosition = (int16_t) MOTOR_POWER / 146 + 15;
+	int16_t current = MOTOR_CURRENT;
+	if(current > 0) stepper1.wPosition = current / 320 + 15;
+	else stepper1.wPosition = current  / 53 + 15;
 	stepper2.wPosition = SPEED_TO_POS(veh_speed);
 	stepper3.wPosition = (hp_batt_perc / 25);
 
@@ -312,13 +315,13 @@ void display_redraw() {
 		u8g2_DrawStr(&u8g2, 70, 10, "Max power");
 		u8g2_DrawStr(&u8g2, 105, 20, "kW");
 		//fp2str(univ_string6, 4*MAX_DISCH_POW, 1, 6, ' ');
-		int2str(univ_string4, 4 * MAX_DISCH_POW / 10, 4, ' ');
+		int2str(univ_string4, MAX_DISCH_POW / 10, 4, ' ');
 		u8g2_DrawStr(&u8g2, 75, 20, univ_string4);
 
 		u8g2_DrawStr(&u8g2, 70, 30, "Max regen.");
 		u8g2_DrawStr(&u8g2, 105, 40, "kW");
 		//fp2str(univ_string6, (4*MAX_REGEN_POW)/5, 1, 6, ' ');
-		int2str(univ_string4, (4 * MAX_REGEN_POW) / 50, 4, ' ');
+		int2str(univ_string4, MAX_REGEN_POW / 10, 4, ' ');
 		u8g2_DrawStr(&u8g2, 75, 40, univ_string4);
 		break;
 		// Mode1 - battery
@@ -339,17 +342,17 @@ void display_redraw() {
 	case DISP_M2:
 		u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
 		u8g2_DrawStr(&u8g2, 25, 10, "Max power  kW");
-		draw_bargraph(12, (MAX_DISCH_POW / 10), "    0", " 400");
+		draw_bargraph(12, (MAX_DISCH_POW) / 35, "    0", " 400");
 
 		u8g2_DrawStr(&u8g2, 25, 30, "Max regen.  kW");
-		draw_bargraph(32, (MAX_REGEN_POW / 10), "    0", " 80");
+		draw_bargraph(32, (MAX_REGEN_POW) / 8, "    0", " 80");
 		//u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
 		//u8g2_DrawStr(&u8g2, 30, 20, "Mode3");
 		break;
 	case DISP_Mcharge: /*OK*/
 		u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
 		u8g2_DrawStr(&u8g2, 35, 20, "CHARGING");
-		draw_bargraph(30, hp_batt_perc, "  0%", "100%");
+		//draw_bargraph(30, hp_batt_perc / 10, "    0", " 100");
 		break;
 	case DISP_Mlast:
 	default:
