@@ -352,7 +352,9 @@ void display_redraw() {
 	case DISP_Mcharge: /*OK*/
 		u8g2_SetFont(&u8g2, u8g2_font_ncenR08_tr);
 		u8g2_DrawStr(&u8g2, 35, 20, "CHARGING");
-		//draw_bargraph(30, hp_batt_perc / 10, "    0", " 100");
+		if (hp_batt_perc != 0)
+			draw_bargraph(30, hp_batt_perc / 10, "    0", " 100");
+		clear_CAN_msg(0x301);
 		break;
 	case DISP_Mlast:
 	default:
@@ -654,6 +656,8 @@ int main(void) {
 			hp_batt_perc = BMS_BAT_CHSTATE;
 			hp_batt_tem_C = BMS_BAT_TEMP;
 			hp_batt_volt = BMS_BAT_VOLT;
+
+
 
 			drive_mode = DRIVE_MODE;
 			display_redraw();

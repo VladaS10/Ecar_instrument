@@ -12,6 +12,11 @@ int16_t get_word_CAN_RX(uint16_t CAN_ID, uint8_t byte_pos)
    return (b_point[1] + (((uint16_t)b_point[0]) << 8));
 }
 
+void clear_CAN_msg(uint16_t CAN_ID)
+{
+	uint8_t clr_data[8] = {0,0,0,0,0,0,0,0};
+	memcpy((void*)&can_data_received[get_CANID_index(CAN_ID)][0], (void*)clr_data, 8);
+}
 
 int16_t convert_CAN_temp(uint8_t temp_byte)
 {
@@ -32,6 +37,7 @@ int16_t convert_CAN_HV(int16_t power_word)
 {
   return (power_word * 10) / 8;
 }
+
 
 uint16_t can_id_table[CAN_RX_COUNT] =
 {
